@@ -20,16 +20,26 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_CDK_STACK_NAME_RESOLVED: FullStackGuildFrontendStack
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: infra/package-lock.json
 
       - name: Verify frontend files exist
         run: |
           test -f frontend/index.html
           test -f frontend/styles.css
           test -f frontend/app.js
+          test -f infra/package.json
+          test -f infra/cdk.json
 
       - name: Validate AWS auth configuration
         run: |
@@ -47,6 +57,10 @@ jobs:
           echo "Set AWS_ROLE_TO_ASSUME as a GitHub repository variable for OIDC, or set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION as GitHub secrets."
           exit 1
 
+      - name: Resolve CDK stack name
+        run: |
+          echo "AWS_CDK_STACK_NAME_RESOLVED=${AWS_CDK_STACK_NAME:-FullStackGuildFrontendStack}" >> "$GITHUB_ENV"
+
       - name: Configure AWS credentials with OIDC
         if: ${{ env.AWS_ROLE_TO_ASSUME != '' }}
         uses: aws-actions/configure-aws-credentials@v6.1.0
@@ -62,15 +76,22 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Install infra dependencies
+        working-directory: infra
+        run: npm ci
+
+      - name: Deploy infrastructure
+        working-directory: infra
+        run: |
+          npx cdk deploy "$AWS_CDK_STACK_NAME_RESOLVED" --require-approval never
+
       - name: Resolve deployment targets
         run: |
-          STACK_NAME="${AWS_CDK_STACK_NAME:-FullStackGuildFrontendStack}"
+          STACK_NAME="$AWS_CDK_STACK_NAME_RESOLVED"
           RESOLVED_BUCKET="$AWS_S3_BUCKET"
           RESOLVED_DISTRIBUTION_ID="$AWS_CLOUDFRONT_DISTRIBUTION_ID"
 
-          if [ -z "$RESOLVED_BUCKET" ] || [ -z "$RESOLVED_DISTRIBUTION_ID" ]; then
-            STACK_OUTPUTS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs" --output json)
-          fi
+          STACK_OUTPUTS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs" --output json)
 
           if [ -z "$RESOLVED_BUCKET" ]; then
             RESOLVED_BUCKET=$(echo "$STACK_OUTPUTS" | jq -r '.[] | select(.OutputKey=="FrontendBucketName") | .OutputValue')
