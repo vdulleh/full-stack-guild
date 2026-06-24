@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }}
 
     steps:
       - name: Checkout repository
@@ -38,7 +40,7 @@ jobs:
           aws s3 sync frontend/ s3://${{ secrets.AWS_S3_BUCKET }} --delete
 
       - name: Invalidate CloudFront cache
-        if: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID != '' }}
+        if: ${{ env.AWS_CLOUDFRONT_DISTRIBUTION_ID != '' }}
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }} \
