@@ -12,7 +12,8 @@ jobs:
     permissions:
       contents: read
     env:
-      AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }}
+      AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+      AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.AWS_CLOUDFRONT_DISTRIBUTION_ID }}
 
     steps:
       - name: Checkout repository
@@ -26,7 +27,7 @@ jobs:
 
       - name: Validate deployment configuration
         run: |
-          test -n "${{ secrets.AWS_S3_BUCKET }}"
+          test -n "$AWS_S3_BUCKET"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -37,11 +38,11 @@ jobs:
 
       - name: Sync frontend to S3
         run: |
-          aws s3 sync frontend/ s3://${{ secrets.AWS_S3_BUCKET }} --delete
+          aws s3 sync frontend/ s3://$AWS_S3_BUCKET --delete
 
       - name: Invalidate CloudFront cache
         if: ${{ env.AWS_CLOUDFRONT_DISTRIBUTION_ID != '' }}
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }} \
+            --distribution-id $AWS_CLOUDFRONT_DISTRIBUTION_ID \
             --paths "/*"

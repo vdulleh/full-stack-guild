@@ -1,6 +1,6 @@
 # Frontend Infrastructure
 
-This CDK app creates the S3 bucket used by the GitHub Actions frontend deployment workflow.
+This CDK app creates the S3 bucket and CloudFront distribution used by the GitHub Actions frontend deployment workflow.
 
 ## Deploy
 
@@ -23,13 +23,18 @@ npx cdk bootstrap
 npx cdk deploy
 ```
 
-4. Copy the `FrontendBucketName` stack output into your GitHub repository secret:
+4. Copy the stack outputs into GitHub:
 
 - `AWS_S3_BUCKET`
+- `AWS_CLOUDFRONT_DISTRIBUTION_ID`
 
-You should also set:
+Recommended mapping:
+
+- `FrontendBucketName` -> GitHub secret `AWS_S3_BUCKET`
+- `FrontendDistributionId` -> GitHub variable `AWS_CLOUDFRONT_DISTRIBUTION_ID`
+
+You should also set these repository secrets:
 
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `AWS_REGION`
-- `AWS_CLOUDFRONT_DISTRIBUTION_ID` optional
