@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Full Stack Guild</title>
+    <meta
+      name="description"
+      content="An interactive roadmap-inspired app for learning full stack development through guided modules, projects, best practices, and interview prep."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Roadmap-driven learning</p>
+          <h1>Full Stack Guild</h1>
+          <p class="hero-text">
+            Learn full stack development through an interactive path inspired by
+            the roadmap.sh full stack journey: foundations first, then frontend,
+            backend, databases, deployment, and real projects.
+          </p>
+          <div class="hero-actions">
+            <button id="jump-to-current" class="primary-btn">Resume Path</button>
+            <button id="reset-progress" class="ghost-btn">Reset Progress</button>
+          </div>
+        </div>
+
+        <section class="progress-panel">
+          <div class="progress-metric">
+            <span>Completion</span>
+            <strong id="completion-rate">0%</strong>
+          </div>
+          <div class="progress-bar" aria-hidden="true">
+            <div id="progress-fill" class="progress-fill"></div>
+          </div>
+          <div class="stats-grid">
+            <article>
+              <span>Modules Done</span>
+              <strong id="modules-done">0</strong>
+            </article>
+            <article>
+              <span>Active Focus</span>
+              <strong id="active-focus">Foundations</strong>
+            </article>
+            <article>
+              <span>Saved Projects</span>
+              <strong id="saved-projects">0</strong>
+            </article>
+          </div>
+        </section>
+      </header>
+
+      <main class="layout">
+        <aside class="sidebar">
+          <section class="panel">
+            <h2>Learning Path</h2>
+            <p class="panel-copy">
+              Follow the suggested order and open each module for projects,
+              best practices, and interview prep.
+            </p>
+            <nav id="path-nav" class="path-nav" aria-label="Learning path"></nav>
+          </section>
+
+          <section class="panel">
+            <h2>Study Tools</h2>
+            <label class="search-label" for="topic-search">Search topics</label>
+            <input
+              id="topic-search"
+              class="search-input"
+              type="search"
+              placeholder="Try APIs, React, SQL..."
+            />
+
+            <label class="search-label" for="stage-filter">Filter by stage</label>
+            <select id="stage-filter" class="search-input">
+              <option value="all">All stages</option>
+            </select>
+          </section>
+        </aside>
+
+        <section class="content">
+          <article id="overview-card" class="overview-card"></article>
+          <section id="module-grid" class="module-grid"></section>
+        </section>
+      </main>
+    </div>
+
+    <template id="module-template">
+      <article class="module-card">
+        <div class="module-head">
+          <div>
+            <p class="module-stage"></p>
+            <h3 class="module-title"></h3>
+          </div>
+          <button class="bookmark-btn" type="button">Save Project</button>
+        </div>
+
+        <p class="module-summary"></p>
+
+        <div class="chip-row topics-row"></div>
+
+        <div class="module-sections">
+          <section>
+            <h4>Why this matters</h4>
+            <p class="module-why"></p>
+          </section>
+
+          <section>
+            <h4>Project Ideas</h4>
+            <ul class="project-list"></ul>
+          </section>
+
+          <section>
+            <h4>Best Practices</h4>
+            <ul class="practice-list"></ul>
+          </section>
+        </div>
+
+        <section class="interview-block">
+          <div class="interview-head">
+            <h4>Interview Questions</h4>
+            <button class="toggle-interview ghost-btn" type="button">
+              Reveal Answers
+            </button>
+          </div>
+          <div class="interview-list"></div>
+        </section>
+
+        <section class="quiz-block">
+          <div class="quiz-head">
+            <h4>Knowledge Check</h4>
+            <span class="quiz-feedback"></span>
+          </div>
+          <p class="quiz-question"></p>
+          <div class="quiz-options"></div>
+        </section>
+
+        <div class="module-footer">
+          <span class="duration-pill"></span>
+          <button class="complete-btn primary-btn" type="button">
+            Mark Complete
+          </button>
+        </div>
+      </article>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
