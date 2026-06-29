@@ -1,109 +1,69 @@
-name: Deploy Frontend to S3
+name: Deploy frontend to S3
 
 on:
   push:
     branches:
-      - master
+      - main
+    paths:
+      - "frontend/**"
+      - "infra/**"
+      - ".github/workflows/deploy-frontend-s3.yml"
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FRONTEND_DIR: frontend
+  INFRA_DIR: infra
+  AWS_REGION: ${{ secrets.AWS_REGION }}
 
 jobs:
   deploy:
+    name: Provision infrastructure and deploy frontend
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    env:
-      AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
-      AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.AWS_CLOUDFRONT_DISTRIBUTION_ID }}
-      AWS_CDK_STACK_NAME: ${{ vars.AWS_CDK_STACK_NAME }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_CDK_STACK_NAME_RESOLVED: FullStackGuildFrontendStack
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: infra/package-lock.json
-
-      - name: Verify frontend files exist
-        run: |
-          test -f frontend/index.html
-          test -f frontend/styles.css
-          test -f frontend/app.js
-          test -f infra/package.json
-          test -f infra/cdk.json
-
-      - name: Validate AWS auth configuration
-        run: |
-          if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ] && [ -n "$AWS_REGION" ]; then
-            echo "Using static AWS credentials from GitHub secrets."
-            exit 0
-          fi
-
-          echo "AWS authentication is not configured."
-          echo "Set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION as GitHub secrets."
-          exit 1
-
-      - name: Resolve CDK stack name
-        run: |
-          echo "AWS_CDK_STACK_NAME_RESOLVED=${AWS_CDK_STACK_NAME:-FullStackGuildFrontendStack}" >> "$GITHUB_ENV"
-
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6.1.0
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Install infra dependencies
-        working-directory: infra
-        run: npm ci
-
-      - name: Deploy infrastructure
-        working-directory: infra
+      - name: Validate frontend files
         run: |
-          npx cdk deploy "$AWS_CDK_STACK_NAME_RESOLVED" --require-approval never
+          test -n "$AWS_REGION"
+          test -f "$FRONTEND_DIR/index.html"
+          test -f "$FRONTEND_DIR/app.js"
+          test -f "$FRONTEND_DIR/styles.css"
 
-      - name: Resolve deployment targets
+      - name: Install CDK dependencies
         run: |
-          STACK_NAME="$AWS_CDK_STACK_NAME_RESOLVED"
-          RESOLVED_BUCKET="$AWS_S3_BUCKET"
-          RESOLVED_DISTRIBUTION_ID="$AWS_CLOUDFRONT_DISTRIBUTION_ID"
+          npm ci
+        working-directory: ${{ env.INFRA_DIR }}
 
-          STACK_OUTPUTS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs" --output json)
-
-          if [ -z "$RESOLVED_BUCKET" ]; then
-            RESOLVED_BUCKET=$(echo "$STACK_OUTPUTS" | jq -r '.[] | select(.OutputKey=="FrontendBucketName") | .OutputValue')
-          fi
-
-          if [ -z "$RESOLVED_DISTRIBUTION_ID" ]; then
-            RESOLVED_DISTRIBUTION_ID=$(echo "$STACK_OUTPUTS" | jq -r '.[] | select(.OutputKey=="FrontendDistributionId") | .OutputValue')
-          fi
-
-          if [ -z "$RESOLVED_BUCKET" ] || [ "$RESOLVED_BUCKET" = "null" ]; then
-            echo "Unable to resolve AWS_S3_BUCKET. Set the AWS_S3_BUCKET secret or deploy the CDK stack and expose FrontendBucketName."
-            exit 1
-          fi
-
-          echo "AWS_S3_BUCKET=$RESOLVED_BUCKET" >> "$GITHUB_ENV"
-
-          if [ -n "$RESOLVED_DISTRIBUTION_ID" ] && [ "$RESOLVED_DISTRIBUTION_ID" != "null" ]; then
-            echo "AWS_CLOUDFRONT_DISTRIBUTION_ID=$RESOLVED_DISTRIBUTION_ID" >> "$GITHUB_ENV"
-          fi
-
-      - name: Sync frontend to S3
+      - name: Deploy S3 website infrastructure
         run: |
-          aws s3 sync frontend/ s3://$AWS_S3_BUCKET --delete
+          npx cdk deploy --require-approval never --outputs-file cdk-outputs.json
+        working-directory: ${{ env.INFRA_DIR }}
 
-      - name: Invalidate CloudFront cache
-        if: ${{ env.AWS_CLOUDFRONT_DISTRIBUTION_ID != '' }}
+      - name: Read infrastructure outputs
         run: |
-          aws cloudfront create-invalidation \
-            --distribution-id $AWS_CLOUDFRONT_DISTRIBUTION_ID \
-            --paths "/*"
+          node -e "const fs = require('fs'); const outputs = JSON.parse(fs.readFileSync('cdk-outputs.json', 'utf8')); const stack = outputs.FullStackLearningFrontendStack; fs.appendFileSync(process.env.GITHUB_ENV, 'S3_BUCKET=' + stack.FrontendBucketName + '\nWEBSITE_URL=' + stack.FrontendWebsiteUrl + '\n');"
+        working-directory: ${{ env.INFRA_DIR }}
+
+      - name: Upload frontend assets
+        run: |
+          aws s3 sync "$FRONTEND_DIR" "s3://$S3_BUCKET" \
+            --delete \
+            --exclude ".DS_Store" \
+            --cache-control "public, max-age=300"
+
+      - name: Print website URL
+        run: |
+          echo "Frontend deployed to:"
+          echo "$WEBSITE_URL"
