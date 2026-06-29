@@ -1,0 +1,63 @@
+name: Deploy frontend to S3
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  S3_BUCKET: ${{ secrets.S3_BUCKET }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy static website
+        run: |
+          aws s3 website "s3://$S3_BUCKET" --index-document index.html --error-document index.html
+          aws s3api put-public-access-block \
+            --bucket "$S3_BUCKET" \
+            --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+
+          cat > bucket-policy.json <<EOF
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "PublicReadGetObject",
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "s3:GetObject",
+                "Resource": "arn:aws:s3:::$S3_BUCKET/*"
+              }
+            ]
+          }
+          EOF
+
+          aws s3api put-bucket-policy \
+            --bucket "$S3_BUCKET" \
+            --policy file://bucket-policy.json
+
+          aws s3 sync frontend "s3://$S3_BUCKET" \
+            --delete \
+            --exclude ".DS_Store" \
+            --cache-control "public, max-age=300"
+
+          echo "Frontend deployed to:"
+          echo "http://$S3_BUCKET.s3-website-$AWS_REGION.amazonaws.com"
