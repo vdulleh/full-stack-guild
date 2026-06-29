@@ -3,7 +3,7 @@ name: Deploy frontend to S3
 on:
   push:
     branches:
-      - master
+      - main
   workflow_dispatch:
 
 permissions:
@@ -12,6 +12,8 @@ permissions:
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
   S3_BUCKET: ${{ secrets.S3_BUCKET }}
+  CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+  CLOUDFRONT_DOMAIN: ${{ secrets.CLOUDFRONT_DOMAIN }}
 
 jobs:
   deploy:
@@ -59,5 +61,15 @@ jobs:
             --exclude ".DS_Store" \
             --cache-control "public, max-age=300"
 
+          if [ -n "$CLOUDFRONT_DISTRIBUTION_ID" ]; then
+            aws cloudfront create-invalidation \
+              --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+              --paths "/*"
+          fi
+
           echo "Frontend deployed to:"
-          echo "http://$S3_BUCKET.s3-website-$AWS_REGION.amazonaws.com"
+          if [ -n "$CLOUDFRONT_DOMAIN" ]; then
+            echo "https://$CLOUDFRONT_DOMAIN"
+          else
+            echo "http://$S3_BUCKET.s3-website-$AWS_REGION.amazonaws.com"
+          fi
